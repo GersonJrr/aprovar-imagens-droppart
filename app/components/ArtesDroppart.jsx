@@ -7,10 +7,10 @@ export function ArtesDroppart() {
   const [categoriaAtiva, setCategoriaAtiva] = useState("");
   const [imagensCarregadas, setImagensCarregadas] = useState(new Set());
 
-  // NOVO — modal de imagem
+  // Modal
   const [imagemModal, setImagemModal] = useState(null);
 
-  // NOVO — toast
+  // Toast
   const [toastMsg, setToastMsg] = useState("");
 
   useEffect(() => {
@@ -39,6 +39,7 @@ export function ArtesDroppart() {
     setImagensCarregadas((prev) => new Set(prev).add(id));
   }, []);
 
+  // 🔴 Recusar imagem
   const handleRecusar = useCallback(async (imagemId) => {
     try {
       await axios.put(
@@ -47,7 +48,7 @@ export function ArtesDroppart() {
         { params: { id: imagemId } }
       );
 
-      // Remover imagem localmente
+      // Remover imagem no estado
       setCategorias((prev) =>
         prev.map((cat) => ({
           ...cat,
@@ -60,16 +61,40 @@ export function ArtesDroppart() {
         }))
       );
 
-      // Mostrar toast
       setToastMsg("Imagem recusada!");
-
     } catch (err) {
-      console.error("Erro ao marcar categoria errada", err);
+      console.error("Erro ao recusar imagem", err);
       setToastMsg("Erro ao recusar imagem!");
     }
   }, []);
 
-  // Remover toast automaticamente após 3s
+  // 🔴 Recusar grupo inteiro
+  const handleRecusarGrupo = useCallback(async (grupoId) => {
+    try {
+      await axios.put(
+        "https://api.innovationbrindes.com.br/api/site/v2/controle-crm/marcar-categoria-errada",
+        {},
+        { params: { id: grupoId } }
+      );
+
+      // remover grupo inteiro
+      setCategorias((prev) =>
+        prev.map((cat) => ({
+          ...cat,
+          grupos: Object.fromEntries(
+            Object.entries(cat.grupos).filter(([id]) => id !== grupoId)
+          ),
+        }))
+      );
+
+      setToastMsg("Grupo concluido!");
+    } catch (err) {
+      console.error("Erro ao recusar grupo", err);
+      setToastMsg("Erro ao recusar grupo!");
+    }
+  }, []);
+
+  // Toast remove sozinho
   useEffect(() => {
     if (!toastMsg) return;
     const t = setTimeout(() => setToastMsg(""), 3000);
@@ -86,35 +111,37 @@ export function ArtesDroppart() {
           <button
             key={cat.categoria}
             onClick={() => setCategoriaAtiva(cat.categoria)}
-            className={`px-4 py-2 rounded-lg border transition 
-              ${
-                categoriaAtiva === cat.categoria
-                  ? "bg-gray-800 text-white border-gray-800"
-                  : "bg-gray-100 text-gray-800 border-gray-300 hover:bg-gray-200"
-              }`}
+            className={`px-4 py-2 rounded-lg border transition ${
+              categoriaAtiva === cat.categoria
+                ? "bg-gray-800 text-white border-gray-800"
+                : "bg-gray-100 text-gray-800 border-gray-300 hover:bg-gray-200"
+            }`}
           >
             {cat.categoria} ({cat.total_grupos})
           </button>
         ))}
       </div>
 
-      {/* LISTA DE GRUPOS */}
+      {/* GRUPOS */}
       {categoriaSelecionada ? (
-        Object.entries(categoriaSelecionada.grupos).map(([grupoId, imagens]) => (
-          <GrupoCard
-            key={grupoId}
-            grupoId={grupoId}
-            imagens={imagens}
-            onRecusar={handleRecusar}
-            onImageLoad={handleImageLoad}
-            openModal={setImagemModal}
-          />
-        ))
+        Object.entries(categoriaSelecionada.grupos).map(
+          ([grupoId, imagens]) => (
+            <GrupoCard
+              key={grupoId}
+              grupoId={grupoId}
+              imagens={imagens}
+              onRecusar={handleRecusar}
+              onRecusarGrupo={handleRecusarGrupo}
+              onImageLoad={handleImageLoad}
+              openModal={setImagemModal}
+            />
+          )
+        )
       ) : (
-        <p>Carregando dados...</p>
+        <p>Carregando...</p>
       )}
 
-      {/* MODAL DA IMAGEM */}
+      {/* MODAL */}
       {imagemModal && (
         <div
           className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50"
@@ -139,14 +166,30 @@ export function ArtesDroppart() {
 }
 
 /* GRUPO CARD */
-function GrupoCard({ grupoId, imagens, onRecusar, onImageLoad, openModal }) {
+function GrupoCard({
+  grupoId,
+  imagens,
+  onRecusar,
+  onRecusarGrupo,
+  onImageLoad,
+  openModal,
+}) {
   return (
     <div className="border border-gray-300 rounded-xl p-4 mb-6 bg-gray-50 shadow-sm">
+
       <div className="flex justify-between items-center mb-3">
         <h3 className="text-lg font-semibold">Grupo: {grupoId}</h3>
+
+        {/* 🔴 BOTÃO PARA RECUSAR GRUPO */}
+        <button
+          onClick={() => onRecusarGrupo(grupoId)}
+          className="px-3 py-1 text-sm bg-green-600 text-white rounded hover:bg-green-700 transition cursor-pointer"
+        >
+          Concluido
+        </button>
       </div>
 
-      {/* GRID 4 IMAGENS */}
+      {/* GRID DAS IMAGENS */}
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
         {imagens.slice(0, 4).map((img) => (
           <ImagemOtimizada
@@ -162,20 +205,21 @@ function GrupoCard({ grupoId, imagens, onRecusar, onImageLoad, openModal }) {
   );
 }
 
-/* IMAGEM OTIMIZADA */
+/* COMPONENTE DA IMAGEM */
 function ImagemOtimizada({ img, onLoad, onRecusar, onClick }) {
   const [carregada, setCarregada] = useState(false);
   const [erro, setErro] = useState(false);
 
   return (
     <div
-      className={`relative w-full h-40 rounded-lg overflow-hidden border border-gray-300
-        ${carregada ? "" : "bg-gray-200 animate-pulse"}`}
+      className={`relative w-full h-40 rounded-lg overflow-hidden border border-gray-300 ${
+        carregada ? "" : "bg-gray-200 animate-pulse"
+      }`}
     >
-      {/* BOTÃO DE RECUSAR */}
+      {/* BOTÃO X */}
       <button
         onClick={(e) => {
-          e.stopPropagation(); // impede abrir modal
+          e.stopPropagation();
           onRecusar(img.id);
         }}
         className="absolute top-2 right-2 z-10 bg-red-600 text-white text-xs px-2 py-1 rounded hover:bg-red-700 transition cursor-pointer"
@@ -183,7 +227,6 @@ function ImagemOtimizada({ img, onLoad, onRecusar, onClick }) {
         X
       </button>
 
-      {/* CLICK para abrir modal */}
       <div className="absolute w-full h-full cursor-pointer" onClick={onClick}>
         {!carregada && !erro && (
           <div className="absolute inset-0 flex items-center justify-center text-gray-600 text-xs">
