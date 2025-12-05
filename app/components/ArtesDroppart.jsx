@@ -185,7 +185,7 @@ function GrupoCard({
           onClick={() => onRecusarGrupo(grupoId)}
           className="px-3 py-1 text-sm bg-green-600 text-white rounded hover:bg-green-700 transition cursor-pointer"
         >
-          Concluido
+          Aprovar
         </button>
       </div>
 
